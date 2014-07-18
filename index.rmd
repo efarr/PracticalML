@@ -1,0 +1,38 @@
+Practical ML: Course Project by Eric Farr
+========================================================
+
+Explore the Data
+----------------
+
+Load libraries and set seed for repeatable results.
+```{r}
+options(warn=-1)
+library(caret)
+library(ggplot2)
+set.seed(101)
+```
+Load data and split into 70% training and 30% validation.
+
+```{r}
+pml <- read.csv("pml-training.csv")
+inTrain <- createDataPartition(y = pml$classe, p = .70, list=FALSE)
+training <- pml[inTrain,]
+testing <- pml[-inTrain,]
+```
+Eliminate columns that are sparsely populated (and not populated in the test data)
+```{r}
+mysubset <- c("user_name", "roll_belt", "pitch_belt", "yaw_belt", "total_accel_belt", "accel_belt_x", "accel_belt_y", "accel_belt_z", "gyros_belt_x", "gyros_belt_y", "gyros_belt_z", "magnet_belt_x", "magnet_belt_y", "magnet_belt_z", "roll_arm", "pitch_arm", "yaw_arm", "total_accel_arm", "gyros_arm_x", "gyros_arm_y", "gyros_arm_z", "accel_arm_x", "accel_arm_y", "accel_arm_z", "magnet_arm_x", "magnet_arm_y", "magnet_arm_z", "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "classe")
+training <- training[mysubset]
+testing <- testing[mysubset]
+```
+
+Find significant variables:
+
+```{r}
+train(training[,3:30], training[,31], preProcess=c("center", "scale"), method="rpart")
+```
+
+```{r fig.width=7, fig.height=6}
+featurePlot(x=training[,c("roll_belt", "pitch_belt", "yaw_belt")], y=training$classe, plot="pairs")
+```
+
