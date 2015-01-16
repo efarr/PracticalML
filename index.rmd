@@ -8,31 +8,56 @@ Load libraries and set seed for repeatable results.
 ```{r}
 options(warn=-1)
 library(caret)
+library(corrplot)
 library(ggplot2)
 set.seed(101)
 ```
-Load data and split into 70% training and 30% validation.
+Load data.
 
 ```{r}
 pml <- read.csv("pml-training.csv")
+pml_test <- read.csv("pml-testing.csv")
+```
+
+Eliminate columns that are sparsely populated (and not populated in the test data)
+```{r}
+goodCols <- names(pml_test[,colSums(is.na(pml_test)) == 0])
+pml_test <- pml_test[,goodCols]
+pml <- pml[,c(which(names(pml) %in% goodCols),160)]
+```
+
+Eliminate columns that are clearly not meaningful
+```{r}
+pml <- pml[,- grep("user_name|X|timestamp|window", names(pml))]
+```
+
+Split into 70% training and 30% validation.
+
+```{r}
 inTrain <- createDataPartition(y = pml$classe, p = .70, list=FALSE)
 training <- pml[inTrain,]
 testing <- pml[-inTrain,]
 ```
-Eliminate columns that are sparsely populated (and not populated in the test data)
+
+Do we have any remaining variables that don't add something?
+
 ```{r}
-mysubset <- c("user_name", "roll_belt", "pitch_belt", "yaw_belt", "total_accel_belt", "accel_belt_x", "accel_belt_y", "accel_belt_z", "gyros_belt_x", "gyros_belt_y", "gyros_belt_z", "magnet_belt_x", "magnet_belt_y", "magnet_belt_z", "roll_arm", "pitch_arm", "yaw_arm", "total_accel_arm", "gyros_arm_x", "gyros_arm_y", "gyros_arm_z", "accel_arm_x", "accel_arm_y", "accel_arm_z", "magnet_arm_x", "magnet_arm_y", "magnet_arm_z", "roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell", "classe")
-training <- training[mysubset]
-testing <- testing[mysubset]
+nearZeroVar(training, saveMetrics=FALSE)
 ```
 
-Find significant variables:
+Do we have any highly correlated variables?
 
 ```{r}
-train(training[,3:30], training[,31], preProcess=c("center", "scale"), method="rpart")
+class <- which(names(training) == "classe")
+correlationMatrix <- cor(training[,-class])
+diag(correlationMatrix) <- 0
+corrplot(correlationMatrix, order = "FPC", method = "color", type = "lower", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+```
+
+The correlation plot shows quite a few highly correlated factors (some positively and some negatively). Instead of manually pulling out redundant variables, we'll make use of principle components analysis to synthesize meaningful variables by combining correlated variables appropriately.
+
+```{r}
 ```
 
 ```{r fig.width=7, fig.height=6}
-featurePlot(x=training[,c("roll_belt", "pitch_belt", "yaw_belt")], y=training$classe, plot="pairs")
 ```
-
