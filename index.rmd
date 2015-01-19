@@ -7,6 +7,7 @@ Explore the Data
 Load libraries and set seed for repeatable results.
 ```{r}
 options(warn=-1)
+library(randomForest)
 library(caret)
 library(corrplot)
 library(ggplot2)
@@ -47,7 +48,7 @@ nearZeroVar(training, saveMetrics=FALSE)
 
 Do we have any highly correlated variables?
 
-```{r}
+```{r fig.width=10, fig.height=10}
 class <- which(names(training) == "classe")
 correlationMatrix <- cor(training[,-class])
 diag(correlationMatrix) <- 0
@@ -57,7 +58,25 @@ corrplot(correlationMatrix, order = "FPC", method = "color", type = "lower", tl.
 The correlation plot shows quite a few highly correlated factors (some positively and some negatively). Instead of manually pulling out redundant variables, we'll make use of principle components analysis to synthesize meaningful variables by combining correlated variables appropriately.
 
 ```{r}
+preProc <- preProcess(training[,-class], method = "pca", thresh=0.97)
+trainPC <- predict(preProc, training[,-class])
+modelFit <- randomForest(training$classe ~ ., data=trainPC)
+
+testPC <- predict(preProc, testing[,-class])
+confusionMatrix(testing$classe, predict(modelFit,testPC))
 ```
 
-```{r fig.width=7, fig.height=6}
+Model fit without using PCA.
+
+```{r}
+modelFit <- randomForest(training$classe ~ ., data=training, importance = TRUE)
+confusionMatrix(testing$classe, predict(modelFit,testing[,-class]))
 ```
+
+Importance of variables:
+
+```{r}
+importance <- data.frame(modelFit$importance)
+importance[order(-importance$MeanDecreaseAccuracy),]
+```
+
