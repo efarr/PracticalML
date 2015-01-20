@@ -1,11 +1,15 @@
 Practical ML: Course Project by Eric Farr
-========================================================
+=========================================
 
-Explore the Data
-----------------
+We are given a set of Human Activity Recognition (HAR) data collected from sensors worn during five exercises (labeled A, B, C, D, and E in a variable called "classe").
+
+Our job is to build a model that predicts the exercise class based on the observed values. We run the model on a hold-out sample of twenty observations and are graded on the accuracy of those predictions.
+
+### Explore the Data
 
 Load libraries and set seed for repeatable results.
-```{r}
+
+```{r message=FALSE}
 options(warn=-1)
 library(randomForest)
 library(caret)
@@ -20,14 +24,14 @@ pml <- read.csv("pml-training.csv")
 pml_test <- read.csv("pml-testing.csv")
 ```
 
-Eliminate columns that are sparsely populated (and not populated in the test data)
+Eliminate columns that are sparsely populated (and not populated in the test data).
 ```{r}
 goodCols <- names(pml_test[,colSums(is.na(pml_test)) == 0])
 pml_test <- pml_test[,goodCols]
 pml <- pml[,c(which(names(pml) %in% goodCols),160)]
 ```
 
-Eliminate columns that are clearly not meaningful
+Eliminate columns that are clearly not meaningful.
 ```{r}
 pml <- pml[,- grep("user_name|X|timestamp|window", names(pml))]
 ```
@@ -40,22 +44,60 @@ training <- pml[inTrain,]
 testing <- pml[-inTrain,]
 ```
 
-Do we have any remaining variables that don't add something?
+Do we have any remaining variables that don't provide meaningful information?
 
 ```{r}
 nearZeroVar(training, saveMetrics=FALSE)
 ```
 
-Do we have any highly correlated variables?
+The remaining variables all provide information.
 
-```{r fig.width=10, fig.height=10}
+### Fit a Model
+
+We'll use our training data to fit a model using the Random Forest algorithm. We'll then see how the model performs on the testing data.
+
+```{r}
 class <- which(names(training) == "classe")
+modelFit <- randomForest(training$classe ~ ., data=training, importance = TRUE)
+confusionMatrix(testing$classe, predict(modelFit,testing[,-class]))
+```
+
+### Cross Validation Result
+
+Our cross validation on the test data shows that we can predict unseen data with 99.6% accuracy. This gives us an out of sample error of 0.4%.
+
+Importance of variables:
+
+```{r}
+importance <- data.frame(modelFit$importance)
+importance <- importance[,grep("Mean", names(importance))]
+importance[order(-importance$MeanDecreaseAccuracy),]
+```
+
+### The Payoff
+
+We now run the model on the test data.
+
+```{r}
+predict(modelFit,pml_test)
+```
+
+Appendix
+--------
+In the process of my data exploration, I looked for correlated variables. When I found some high correlations, I decided to use Principle Components Analysis (PCA) to combine variables and model off of them. This gave me a model accuracy (with Random Forest) of 97%. 
+
+This not a bad result, but when I ran a Random Forest model on the variables directly, I saw accuracy of 99+%. Therefore, I didn't use the PCA-based model.
+
+### Correlation Matrix
+```{r fig.width=10, fig.height=10}
 correlationMatrix <- cor(training[,-class])
 diag(correlationMatrix) <- 0
 corrplot(correlationMatrix, order = "FPC", method = "color", type = "lower", tl.cex = 0.8, tl.col = rgb(0, 0, 0))
 ```
 
-The correlation plot shows quite a few highly correlated factors (some positively and some negatively). Instead of manually pulling out redundant variables, we'll make use of principle components analysis to synthesize meaningful variables by combining correlated variables appropriately.
+### Principle Components Analysis
+
+The correlation plot shows quite a few highly correlated factors (some positively and some negatively). Instead of manually pulling out redundant variables, we'll make use of PCA to synthesize meaningful variables by combining correlated variables appropriately.
 
 ```{r}
 preProc <- preProcess(training[,-class], method = "pca", thresh=0.97)
@@ -65,18 +107,3 @@ modelFit <- randomForest(training$classe ~ ., data=trainPC)
 testPC <- predict(preProc, testing[,-class])
 confusionMatrix(testing$classe, predict(modelFit,testPC))
 ```
-
-Model fit without using PCA.
-
-```{r}
-modelFit <- randomForest(training$classe ~ ., data=training, importance = TRUE)
-confusionMatrix(testing$classe, predict(modelFit,testing[,-class]))
-```
-
-Importance of variables:
-
-```{r}
-importance <- data.frame(modelFit$importance)
-importance[order(-importance$MeanDecreaseAccuracy),]
-```
-
